@@ -138,10 +138,10 @@ export function transitionBlockers(
   if (to === 'live') {
     // Defensive re-check: readiness can regress while waiting.
     blockers.push(...unmetReadinessBlockers(event));
-    if (event.stream.status === 'failed') {
+    if (event.stream.status === 'error') {
       blockers.push({
-        code: 'stream-ingest-failed',
-        message: 'Ingest is in a failed state — resolve the stream before going live.',
+        code: 'stream-ingest-error',
+        message: 'Ingest is in an error state — resolve the stream before going live.',
       });
     }
   }

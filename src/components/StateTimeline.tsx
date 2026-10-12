@@ -11,7 +11,11 @@ export function StateTimeline({ steps }: { steps: TimelineStep[] }) {
   return (
     <ol className="timeline">
       {steps.map((step) => (
-        <li key={step.state} className={`timeline__step timeline__step--${step.status}`}>
+        <li
+          key={step.state}
+          className={`timeline__step timeline__step--${step.status}`}
+          data-guide={`Lifecycle: ${step.label} (${step.status})`}
+        >
           <span className="timeline__mark" aria-hidden>
             {MARK[step.status]}
           </span>

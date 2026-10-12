@@ -1,10 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { HostEvent, ReadinessRequirement } from './types';
-import {
-  canTransition,
-  isTransitionAllowed,
-  transitionBlockers,
-} from './machine';
+import { canTransition, isTransitionAllowed, transitionBlockers } from './machine';
 import { eventReducer } from './reducer';
 
 function req(
@@ -20,10 +16,20 @@ function makeEvent(overrides: Partial<HostEvent> = {}): HostEvent {
       id: 'evt_1',
       title: 'Test Event',
       host: 'Tester',
-      scheduledStartAt: '2026-10-18T19:00:00.000Z',
-      timezone: 'UTC',
+      category: 'CONCERT',
+      city: 'Lagos',
+      scheduledStartAt: '2026-10-18T18:00:00.000Z',
+      timezone: 'Africa/Lagos (WAT)',
+      plannedDurationMinutes: 120,
+      accessModel: 'PAID',
+      currency: 'NGN',
+      ticketPrice: '10000',
       ticketCapacity: 100,
       ticketsSold: 0,
+      productionMode: 'SELF',
+      crewCount: 0,
+      replayAccess: 'INCLUDED',
+      backupStreamEnabled: false,
     },
     state: 'scheduled',
     requirements: [
@@ -31,7 +37,8 @@ function makeEvent(overrides: Partial<HostEvent> = {}): HostEvent {
       req('ingest_configured', 'satisfied'),
       req('ticket_pricing', 'satisfied'),
     ],
-    stream: { status: 'idle' },
+    stream: { status: 'idle', quality: 'good' },
+    issues: [],
     ...overrides,
   };
 }
@@ -49,8 +56,7 @@ describe('lifecycle guards', () => {
       state: 'draft',
       details: { ...makeEvent().details, scheduledStartAt: null },
     });
-    const blockers = transitionBlockers(event, 'scheduled');
-    expect(blockers.map((b) => b.code)).toContain('missing-schedule');
+    expect(transitionBlockers(event, 'scheduled').map((b) => b.code)).toContain('missing-schedule');
     expect(canTransition(event, 'scheduled')).toBe(false);
   });
 
@@ -62,8 +68,7 @@ describe('lifecycle guards', () => {
         req('ticket_pricing', 'missing'),
       ],
     });
-    const blockers = transitionBlockers(event, 'ready_for_streaming');
-    expect(blockers).toHaveLength(2);
+    expect(transitionBlockers(event, 'ready_for_streaming')).toHaveLength(2);
     expect(canTransition(event, 'ready_for_streaming')).toBe(false);
   });
 
@@ -71,24 +76,19 @@ describe('lifecycle guards', () => {
     expect(canTransition(makeEvent(), 'ready_for_streaming')).toBe(true);
   });
 
-  test('live transition is blocked when ingest has failed', () => {
+  test('live transition is blocked when ingest is in an error state', () => {
     const event = makeEvent({
       state: 'ready_for_streaming',
-      stream: { status: 'failed', message: 'ingest down' },
+      stream: { status: 'error', quality: 'good', message: 'ingest down' },
     });
-    const blockers = transitionBlockers(event, 'live');
-    expect(blockers.map((b) => b.code)).toContain('stream-ingest-failed');
+    expect(transitionBlockers(event, 'live').map((b) => b.code)).toContain('stream-ingest-error');
   });
 });
 
 describe('reducer', () => {
-  test('applies a satisfied requirement and unblocks the transition', () => {
+  test('satisfying a requirement unblocks and allows the transition', () => {
     const blocked = makeEvent({
-      requirements: [
-        req('crew_assigned', 'satisfied'),
-        req('ingest_configured', 'satisfied'),
-        req('ticket_pricing', 'missing'),
-      ],
+      requirements: [req('crew_assigned', 'satisfied'), req('ticket_pricing', 'missing')],
     });
     expect(canTransition(blocked, 'ready_for_streaming')).toBe(false);
 
@@ -104,17 +104,28 @@ describe('reducer', () => {
   });
 
   test('rejects a blocked transition (no-op)', () => {
-    const event = makeEvent({
-      requirements: [req('crew_assigned', 'missing')],
-    });
-    const next = eventReducer(event, { type: 'MARK_READY' });
-    expect(next).toBe(event);
+    const event = makeEvent({ requirements: [req('crew_assigned', 'missing')] });
+    expect(eventReducer(event, { type: 'MARK_READY' })).toBe(event);
   });
 
-  test('going live moves ingest into connecting', () => {
-    const event = makeEvent({ state: 'ready_for_streaming' });
-    const live = eventReducer(event, { type: 'GO_LIVE' })!;
+  test('going live moves ingest into pending', () => {
+    const live = eventReducer(makeEvent({ state: 'ready_for_streaming' }), { type: 'GO_LIVE' })!;
     expect(live.state).toBe('live');
-    expect(live.stream.status).toBe('connecting');
+    expect(live.stream.status).toBe('pending');
+  });
+
+  test('reporting an issue adds it to the event', () => {
+    const next = eventReducer(makeEvent(), {
+      type: 'REPORT_ISSUE',
+      issue: {
+        id: 'iss_1',
+        type: 'QUALITY_ISSUE',
+        status: 'OPEN',
+        note: 'blurry',
+        openedAt: new Date().toISOString(),
+      },
+    })!;
+    expect(next.issues).toHaveLength(1);
+    expect(next.issues[0].status).toBe('OPEN');
   });
 });

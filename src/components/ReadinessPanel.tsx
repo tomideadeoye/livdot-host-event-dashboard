@@ -20,7 +20,7 @@ export function ReadinessPanel({
 }) {
   const { blocking, blockingSatisfied, isReady } = readiness;
   return (
-    <section className="panel">
+    <section className="panel" data-guide="Readiness — the gate to going live">
       <header className="panel__header">
         <h2 className="panel__title">Operational readiness</h2>
         <button
@@ -39,7 +39,15 @@ export function ReadinessPanel({
 
       <ul className="req-list">
         {readiness.requirements.map((r) => (
-          <li key={r.id} className={`req req--${r.status}`}>
+          <li
+            key={r.id}
+            className={`req req--${r.status}`}
+            data-guide={
+              r.status === 'satisfied'
+                ? `${r.label} — satisfied`
+                : `${r.label} — fix in the simulator below`
+            }
+          >
             <div className="req__main">
               <span className="req__label">
                 {r.label}

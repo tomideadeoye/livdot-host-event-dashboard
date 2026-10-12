@@ -3,11 +3,11 @@ import type { HostEvent, ReadinessRequirement, StreamHealth } from './types';
 /**
  * Mock backend.
  *
- * The assessment explicitly allows simulated backend behaviour. Rather than
- * resolving instantly (which would hide the async states we were asked to
- * demonstrate), every call has latency and the seed data deliberately starts
- * with requirements in `pending` and `missing` so the "incomplete
- * configuration" and "blocked action" paths are visible on first paint.
+ * The assessment allows simulated backend behaviour. Rather than resolving
+ * instantly (which would hide the async states we were asked to demonstrate),
+ * every call has latency and the seed data deliberately starts with
+ * requirements in `pending` and `missing` so the "incomplete configuration"
+ * and "blocked action" paths are visible on first paint.
  */
 
 const LATENCY_MS = 600;
@@ -26,7 +26,7 @@ function seedRequirements(): ReadinessRequirement[] {
     {
       id: 'ingest_configured',
       label: 'Streaming ingest configured',
-      description: 'RTMP ingest endpoint and stream key are provisioned.',
+      description: 'RTMPS/SRT ingest endpoint and stream key are provisioned.',
       status: 'pending',
       blocking: true,
     },
@@ -47,14 +47,25 @@ export async function fetchEvent(): Promise<HostEvent> {
       id: 'evt_01HZX',
       title: 'Afrobeats Live Sessions — Finale',
       host: 'Tomide Adeoye',
-      scheduledStartAt: '2026-10-18T19:00:00.000Z',
-      timezone: 'Africa/Lagos (GMT+1)',
+      category: 'CONCERT',
+      city: 'Lagos',
+      scheduledStartAt: '2026-10-18T18:00:00.000Z',
+      timezone: 'Africa/Lagos (WAT)',
+      plannedDurationMinutes: 150,
+      accessModel: 'PAID',
+      currency: 'NGN',
+      ticketPrice: '15000',
       ticketCapacity: 500,
       ticketsSold: 128,
+      productionMode: 'HIRE',
+      crewCount: 3,
+      replayAccess: 'INCLUDED',
+      backupStreamEnabled: true,
     },
     state: 'scheduled',
     requirements: seedRequirements(),
-    stream: { status: 'idle' },
+    stream: { status: 'idle', quality: 'good' },
+    issues: [],
   };
 }
 
@@ -75,10 +86,5 @@ export async function recheckReadiness(
 
 export async function startStream(): Promise<StreamHealth> {
   await delay(1200);
-  return {
-    status: 'healthy',
-    bitrateKbps: 4500,
-    viewers: 0,
-    message: 'Ingest healthy.',
-  };
+  return { status: 'active', quality: 'good', bitrateKbps: 4500, viewers: 0, message: 'Ingest healthy.' };
 }

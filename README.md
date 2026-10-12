@@ -157,3 +157,33 @@ simulator** panel drives:
 Real API + polling/websockets for readiness and stream health; optimistic
 updates with rollback on the go-live path; server-backed audit log; and the
 readiness checks become subscriptions rather than pull-based rechecks.
+
+---
+
+## Interface notes
+
+- **Motion** — entrance reveals and state transitions use **Framer Motion**
+  (`Reveal.tsx`, `AnimatePresence` in `Dashboard.tsx`); the REC pulse, live
+  badge, marquee and ambient drift use CSS keyframes and honour
+  `prefers-reduced-motion`.
+- **Ambient backdrop** — the colour "mood" tracks the event state
+  (`AmbientBackdrop.tsx`).
+- **Hover guidance** — any element carrying `data-guide` shows a
+  cursor-following nudge toward the next action and spotlights the primary
+  action button (`NextActionGuide.tsx`).
+
+## Access gate
+
+The UI can be gated behind a typed passphrase via a build flag
+(`next.config.mjs`):
+
+```bash
+bun run build                      # gated (default) — "type tomide"
+ACCESS_GATE=off bun run build      # ungated (public submission build)
+```
+
+The passphrase is `tomide` by default and can be overridden with
+`ACCESS_CODE`. This is a **client-side** gate (it hides the UI, not the
+bundle); a production version would enforce it in Next middleware against a
+cookie.
+

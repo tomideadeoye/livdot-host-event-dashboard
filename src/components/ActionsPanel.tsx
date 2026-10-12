@@ -11,7 +11,7 @@ export function ActionsPanel({
 }) {
   if (actions.length === 0) {
     return (
-      <section className="panel">
+      <section className="panel" data-guide="Actions">
         <header className="panel__header">
           <h2 className="panel__title">Actions</h2>
         </header>
@@ -21,7 +21,7 @@ export function ActionsPanel({
   }
 
   return (
-    <section className="panel">
+    <section className="panel" data-guide="Available actions for this state">
       <header className="panel__header">
         <h2 className="panel__title">Actions</h2>
       </header>
@@ -29,6 +29,8 @@ export function ActionsPanel({
         <div key={action.id} className="action">
           <button
             className="btn btn--primary"
+            data-primary-action
+            data-guide={action.enabled ? `Ready: ${action.label}` : 'Blocked — see why'}
             onClick={() => onAction(action.id)}
             disabled={!action.enabled || busy}
             aria-disabled={!action.enabled}

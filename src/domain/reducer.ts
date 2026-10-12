@@ -27,6 +27,38 @@ export function eventReducer(
     case 'SET_STREAM':
       return { ...event, stream: command.stream };
 
+    case 'SET_REPLAY_ACCESS':
+      return {
+        ...event,
+        details: { ...event.details, replayAccess: command.access },
+      };
+
+    case 'SET_PRODUCTION_MODE':
+      return {
+        ...event,
+        details: { ...event.details, productionMode: command.mode },
+      };
+
+    case 'TOGGLE_BACKUP_STREAM':
+      return {
+        ...event,
+        details: {
+          ...event.details,
+          backupStreamEnabled: !event.details.backupStreamEnabled,
+        },
+      };
+
+    case 'REPORT_ISSUE':
+      return { ...event, issues: [command.issue, ...event.issues] };
+
+    case 'RESOLVE_ISSUE':
+      return {
+        ...event,
+        issues: event.issues.map((i) =>
+          i.id === command.id ? { ...i, status: 'RESOLVED' } : i,
+        ),
+      };
+
     case 'RESET':
       return command.event;
 
@@ -66,10 +98,10 @@ function applyTransition(event: HostEvent, to: HostEvent['state']): HostEvent {
     return event; // blocked — no-op
   }
   if (to === 'live') {
-    return { ...event, state: to, stream: { status: 'connecting' } };
+    return { ...event, state: to, stream: { status: 'pending', quality: 'good' } };
   }
   if (to === 'completed') {
-    return { ...event, state: to, stream: { ...event.stream, status: 'idle' } };
+    return { ...event, state: to, stream: { ...event.stream, status: 'ended' } };
   }
   return { ...event, state: to };
 }

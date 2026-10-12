@@ -19,9 +19,7 @@ export interface ReadinessView {
   satisfied: number;
   blocking: number;
   blockingSatisfied: number;
-  /** True when every blocking requirement is satisfied. */
   isReady: boolean;
-  /** Any requirement whose status we cannot yet confirm. */
   hasIndeterminate: boolean;
 }
 
@@ -47,6 +45,7 @@ export interface DashboardView {
   readiness: ReadinessView;
   actions: ActionDescriptor[];
   alerts: Alert[];
+  openIssues: number;
 }
 
 const ACTION_FOR_STATE: Record<
@@ -89,26 +88,21 @@ const ACTION_FOR_STATE: Record<
 function buildTimeline(current: EventState): TimelineStep[] {
   const currentIndex = LIFECYCLE.indexOf(current);
   return LIFECYCLE.map((state, index) => {
-    let status: TimelineStatus;
-    if (index < currentIndex) status = 'done';
-    else if (index === currentIndex) status = 'current';
-    else status = 'upcoming';
+    const status: TimelineStatus =
+      index < currentIndex ? 'done' : index === currentIndex ? 'current' : 'upcoming';
     return { state, label: STATE_META[state].label, status };
   });
 }
 
 function buildReadiness(event: HostEvent): ReadinessView {
   const blockingReqs = event.requirements.filter((r) => r.blocking);
-  const blockingSatisfied = blockingReqs.filter(
-    (r) => r.status === 'satisfied',
-  ).length;
+  const blockingSatisfied = blockingReqs.filter((r) => r.status === 'satisfied').length;
   return {
     requirements: event.requirements,
-    satisfied: event.requirements.filter((r) => r.status === 'satisfied')
-      .length,
+    satisfied: event.requirements.filter((r) => r.status === 'satisfied').length,
     blocking: blockingReqs.length,
     blockingSatisfied,
-    isReady: blockingSatisfied === blockingReqs.length && blockingReqs.length > 0,
+    isReady: blockingReqs.length > 0 && blockingSatisfied === blockingReqs.length,
     hasIndeterminate: event.requirements.some(
       (r) => r.status === 'pending' || r.status === 'unknown',
     ),
@@ -133,17 +127,18 @@ function buildActions(event: HostEvent): ActionDescriptor[] {
 
 function buildAlerts(event: HostEvent, readiness: ReadinessView): Alert[] {
   const alerts: Alert[] = [];
+  const openIssues = event.issues.filter((i) => i.status !== 'RESOLVED').length;
 
-  if (event.stream.status === 'failed') {
+  if (event.stream.status === 'error') {
     alerts.push({
-      id: 'stream-failed',
+      id: 'stream-error',
       severity: 'critical',
-      title: 'Stream ingest failed',
+      title: 'Stream ingest error',
       message:
         event.stream.message ??
-        'The broadcast ingest reports a failure. Viewers cannot receive the stream until it is restored.',
+        'The broadcast ingest reports an error. Viewers cannot receive the stream until it is restored.',
     });
-  } else if (event.stream.status === 'degraded') {
+  } else if (event.stream.status === 'active' && event.stream.quality === 'low') {
     alerts.push({
       id: 'stream-degraded',
       severity: 'warning',
@@ -179,12 +174,21 @@ function buildAlerts(event: HostEvent, readiness: ReadinessView): Alert[] {
     });
   }
 
+  if (openIssues > 0) {
+    alerts.push({
+      id: 'open-issues',
+      severity: 'warning',
+      title: `${openIssues} open issue${openIssues === 1 ? '' : 's'}`,
+      message: 'Viewer-reported issues are open. Review and resolve them below.',
+    });
+  }
+
   return alerts;
 }
 
 /**
  * The single derivation point: raw event state in, everything the UI renders
- * out. Components stay dumb; all business rules live here and in the machine.
+ * out. Components stay dumb; business rules live here and in the machine.
  */
 export function deriveDashboard(event: HostEvent): DashboardView {
   const readiness = buildReadiness(event);
@@ -194,5 +198,6 @@ export function deriveDashboard(event: HostEvent): DashboardView {
     readiness,
     actions: buildActions(event),
     alerts: buildAlerts(event, readiness),
+    openIssues: event.issues.filter((i) => i.status !== 'RESOLVED').length,
   };
 }

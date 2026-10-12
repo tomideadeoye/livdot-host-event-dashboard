@@ -5,17 +5,17 @@ import type {
   EventCommand,
   EventState,
   HostEvent,
+  Issue,
+  IssueType,
+  ProductionMode,
+  ReplayAccess,
   RequirementId,
   RequirementStatus,
   StreamHealth,
 } from '@/domain/types';
 import { eventReducer } from '@/domain/reducer';
 import { deriveDashboard, type DashboardView } from '@/domain/selectors';
-import {
-  fetchEvent,
-  recheckReadiness,
-  startStream,
-} from '@/domain/mockApi';
+import { fetchEvent, recheckReadiness, startStream } from '@/domain/mockApi';
 
 type LoadStatus = 'loading' | 'ready' | 'error';
 
@@ -24,17 +24,21 @@ export interface EventDashboardController {
   event: HostEvent | null;
   view: DashboardView | null;
   activity: string[];
+  liveSince: number | null;
   dispatch: (command: EventCommand) => void;
   recheck: () => Promise<void>;
   setRequirement: (id: RequirementId, status: RequirementStatus) => void;
   setStream: (stream: StreamHealth) => void;
   setSchedule: (startAt: string | null) => void;
+  setReplayAccess: (access: ReplayAccess) => void;
+  setProductionMode: (mode: ProductionMode) => void;
+  toggleBackup: () => void;
+  reportIssue: (type: IssueType) => void;
+  resolveIssue: (id: string) => void;
   simulateState: (state: EventState) => void;
 }
 
 function requirementsFor(state: EventState): HostEvent['requirements'] {
-  // Past `scheduled` we assume configuration is complete; before that we keep
-  // a deliberately mixed state so blocked-state UI is demonstrable.
   const settled = state !== 'draft' && state !== 'scheduled';
   return [
     {
@@ -47,7 +51,7 @@ function requirementsFor(state: EventState): HostEvent['requirements'] {
     {
       id: 'ingest_configured',
       label: 'Streaming ingest configured',
-      description: 'RTMP ingest endpoint and stream key are provisioned.',
+      description: 'RTMPS/SRT ingest endpoint and stream key are provisioned.',
       status: settled ? 'satisfied' : 'pending',
       blocking: true,
     },
@@ -62,22 +66,23 @@ function requirementsFor(state: EventState): HostEvent['requirements'] {
 }
 
 function streamFor(state: EventState): StreamHealth {
-  if (state === 'live') return { status: 'healthy', bitrateKbps: 4500, viewers: 128, message: 'Ingest healthy.' };
-  if (state === 'completed' || state === 'replay_available') return { status: 'idle' };
-  return { status: 'idle' };
+  if (state === 'live')
+    return { status: 'active', quality: 'good', bitrateKbps: 4500, viewers: 128, message: 'Ingest healthy.' };
+  if (state === 'completed' || state === 'replay_available') return { status: 'ended', quality: 'good' };
+  return { status: 'idle', quality: 'good' };
 }
 
 export function useEventDashboard(): EventDashboardController {
   const [event, dispatch] = useReducer(eventReducer, null as HostEvent | null);
   const [status, setStatus] = useState<LoadStatus>('loading');
   const [activity, setActivity] = useState<string[]>([]);
+  const [liveSince, setLiveSince] = useState<number | null>(null);
 
   const log = useCallback((entry: string) => {
     const stamp = new Date().toLocaleTimeString();
-    setActivity((prev) => [`${stamp}  ${entry}`, ...prev].slice(0, 12));
+    setActivity((prev) => [`${stamp}  ${entry}`, ...prev].slice(0, 14));
   }, []);
 
-  // Initial load.
   useEffect(() => {
     let cancelled = false;
     setStatus('loading');
@@ -94,14 +99,20 @@ export function useEventDashboard(): EventDashboardController {
     };
   }, [log]);
 
+  // Track when the event goes live (for the uptime readout).
+  useEffect(() => {
+    if (event?.state === 'live') setLiveSince((prev) => prev ?? Date.now());
+    else setLiveSince(null);
+  }, [event?.state]);
+
   // When the event enters `live`, simulate the ingest coming up.
   useEffect(() => {
-    if (event?.state === 'live' && event.stream.status === 'connecting') {
+    if (event?.state === 'live' && event.stream.status === 'pending') {
       let cancelled = false;
       startStream().then((stream) => {
         if (cancelled) return;
         dispatch({ type: 'SET_STREAM', stream });
-        log('Ingest connected — stream healthy');
+        log('Ingest connected — stream active');
       });
       return () => {
         cancelled = true;
@@ -122,17 +133,9 @@ export function useEventDashboard(): EventDashboardController {
     if (!event) return;
     log('Rechecking readiness…');
     const requirements = await recheckReadiness(event);
-    const resolved = requirements.filter(
-      (r, i) => r.status !== event.requirements[i].status,
-    ).length;
-    requirements.forEach((r) =>
-      dispatch({ type: 'SET_REQUIREMENT', id: r.id, status: r.status }),
-    );
-    log(
-      resolved > 0
-        ? `Readiness rechecked — ${resolved} requirement(s) updated`
-        : 'Readiness rechecked — no changes',
-    );
+    const resolved = requirements.filter((r, i) => r.status !== event.requirements[i].status).length;
+    requirements.forEach((r) => dispatch({ type: 'SET_REQUIREMENT', id: r.id, status: r.status }));
+    log(resolved > 0 ? `Readiness rechecked — ${resolved} updated` : 'Readiness rechecked — no changes');
   }, [event, log]);
 
   const setRequirement = useCallback(
@@ -159,19 +162,58 @@ export function useEventDashboard(): EventDashboardController {
     [log],
   );
 
+  const setReplayAccess = useCallback(
+    (access: ReplayAccess) => {
+      dispatch({ type: 'SET_REPLAY_ACCESS', access });
+      log(`Replay access → ${access}`);
+    },
+    [log],
+  );
+
+  const setProductionMode = useCallback(
+    (mode: ProductionMode) => {
+      dispatch({ type: 'SET_PRODUCTION_MODE', mode });
+      log(`Production mode → ${mode}`);
+    },
+    [log],
+  );
+
+  const toggleBackup = useCallback(() => {
+    dispatch({ type: 'TOGGLE_BACKUP_STREAM' });
+    log('Backup stream toggled');
+  }, [log]);
+
+  const reportIssue = useCallback(
+    (type: IssueType) => {
+      const issue: Issue = {
+        id: `iss_${Date.now()}`,
+        type,
+        status: 'OPEN',
+        note: 'Reported from the host dashboard.',
+        openedAt: new Date().toISOString(),
+      };
+      dispatch({ type: 'REPORT_ISSUE', issue });
+      log(`Issue reported: ${type}`);
+    },
+    [log],
+  );
+
+  const resolveIssue = useCallback(
+    (id: string) => {
+      dispatch({ type: 'RESOLVE_ISSUE', id });
+      log('Issue resolved');
+    },
+    [log],
+  );
+
   const simulateState = useCallback(
     (state: EventState) => {
       if (!event) return;
       dispatch({
         type: 'RESET',
-        event: {
-          ...event,
-          state,
-          requirements: requirementsFor(state),
-          stream: streamFor(state),
-        },
+        event: { ...event, state, requirements: requirementsFor(state), stream: streamFor(state) },
       });
-      log(`Simulator: jumped to “${state}”`);
+      log(`Simulator: jumped to "${state}"`);
     },
     [event, log],
   );
@@ -183,11 +225,17 @@ export function useEventDashboard(): EventDashboardController {
     event,
     view,
     activity,
+    liveSince,
     dispatch: guardedDispatch,
     recheck,
     setRequirement,
     setStream,
     setSchedule,
+    setReplayAccess,
+    setProductionMode,
+    toggleBackup,
+    reportIssue,
+    resolveIssue,
     simulateState,
   };
 }
