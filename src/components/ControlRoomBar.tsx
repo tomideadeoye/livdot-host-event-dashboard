@@ -23,7 +23,11 @@ export function ControlRoomBar({ isLive }: { isLive: boolean }) {
   }, []);
 
   return (
-    <div className={`control-room ${isLive ? 'is-live' : ''}`} data-guide={isLive ? 'On air — monitor below' : 'Control-room status'}>
+    <div
+      className={`control-room ${isLive ? 'is-live' : ''}`}
+      data-tour="control-room"
+      data-guide={isLive ? 'On air — monitor below' : 'Control-room status'}
+    >
       <span className="control-room__left">
         <span className={`rec-dot ${isLive ? 'rec-dot--live' : ''}`} aria-hidden />
         <span className="control-room__label">

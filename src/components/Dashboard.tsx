@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { EventCommand } from '@/domain/types';
 import { useEventDashboard } from '@/hooks/useEventDashboard';
@@ -9,6 +9,7 @@ import { LiveTicker } from './LiveTicker';
 import { OrbitMark } from './OrbitMark';
 import { AmbientBackdrop } from './AmbientBackdrop';
 import { NextActionGuide } from './NextActionGuide';
+import { ProductTour, shouldShowTour } from './ProductTour';
 import { Reveal } from './Reveal';
 import { StatusBadge } from './StatusBadge';
 import { StateTimeline } from './StateTimeline';
@@ -48,6 +49,13 @@ const swap = {
 export function Dashboard() {
   const c = useEventDashboard();
   const [rechecking, setRechecking] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+
+  useEffect(() => {
+    // Let the panels paint before the tour measures their targets.
+    const t = window.setTimeout(() => setTourOpen(shouldShowTour()), 700);
+    return () => window.clearTimeout(t);
+  }, []);
 
   if (c.status === 'loading' || !c.event || !c.view) {
     return <div className="state-screen">Connecting to control room…</div>;
@@ -86,6 +94,8 @@ export function Dashboard() {
       <ControlRoomBar isLive={isLive} />
       <LiveTicker />
 
+      {tourOpen && <ProductTour onDone={() => setTourOpen(false)} />}
+
       <Reveal>
         <header className="dash-header">
           <div>
@@ -93,6 +103,13 @@ export function Dashboard() {
             <h1 className="dash-header__title">{event.details.title}</h1>
           </div>
           <div className="dash-header__status">
+            <button
+              className="btn btn--sm btn--ghost"
+              data-guide="Replay the walkthrough"
+              onClick={() => setTourOpen(true)}
+            >
+              Tour
+            </button>
             <OrbitMark live={isLive} />
             <StatusBadge meta={view.stateMeta} />
           </div>
@@ -104,7 +121,7 @@ export function Dashboard() {
       </Reveal>
 
       <Reveal delay={0.1}>
-        <section className="panel">
+        <section className="panel" data-tour="lifecycle">
           <header className="panel__header">
             <h2 className="panel__title">Lifecycle</h2>
           </header>

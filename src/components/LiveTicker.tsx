@@ -23,7 +23,7 @@ const FEEDS: Feed[] = [
 export function LiveTicker() {
   const [paused, setPaused] = useState(false);
   return (
-    <div className={`ticker ${paused ? 'is-paused' : ''}`} data-guide="Live feeds — hover to pause">
+    <div className={`ticker ${paused ? 'is-paused' : ''}`} data-tour="ticker" data-guide="Live feeds — hover to pause">
       <span className="ticker__label">
         <span className="rec-dot rec-dot--live" aria-hidden />
         Live now

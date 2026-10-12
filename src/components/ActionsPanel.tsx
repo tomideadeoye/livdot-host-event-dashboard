@@ -11,7 +11,7 @@ export function ActionsPanel({
 }) {
   if (actions.length === 0) {
     return (
-      <section className="panel" data-guide="Actions">
+      <section className="panel" data-tour="actions" data-guide="Actions">
         <header className="panel__header">
           <h2 className="panel__title">Actions</h2>
         </header>
@@ -21,7 +21,7 @@ export function ActionsPanel({
   }
 
   return (
-    <section className="panel" data-guide="Available actions for this state">
+    <section className="panel" data-tour="actions" data-guide="Available actions for this state">
       <header className="panel__header">
         <h2 className="panel__title">Actions</h2>
       </header>

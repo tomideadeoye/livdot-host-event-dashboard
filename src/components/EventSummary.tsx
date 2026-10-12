@@ -37,7 +37,7 @@ function priceLine(event: HostEvent): string {
 export function EventSummary({ event, meta }: { event: HostEvent; meta: StateMeta }) {
   const { details, stream } = event;
   return (
-    <section className="panel" data-guide="Event details">
+    <section className="panel" data-tour="event" data-guide="Event details">
       <header className="panel__header">
         <h2 className="panel__title">Event</h2>
         <span className="cat-tag">

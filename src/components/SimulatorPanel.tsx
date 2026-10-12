@@ -41,7 +41,7 @@ export function SimulatorPanel({
   const [when, setWhen] = useState(() => toLocalInput(event.details.scheduledStartAt));
 
   return (
-    <section className="panel panel--sim">
+    <section className="panel panel--sim" data-tour="simulator">
       <header className="panel__header">
         <h2 className="panel__title">Backend simulator</h2>
         <span className="tag">mock</span>

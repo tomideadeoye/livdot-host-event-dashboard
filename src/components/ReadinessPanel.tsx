@@ -20,7 +20,7 @@ export function ReadinessPanel({
 }) {
   const { blocking, blockingSatisfied, isReady } = readiness;
   return (
-    <section className="panel" data-guide="Readiness — the gate to going live">
+    <section className="panel" data-tour="readiness" data-guide="Readiness — the gate to going live">
       <header className="panel__header">
         <h2 className="panel__title">Operational readiness</h2>
         <button
